@@ -8,28 +8,36 @@
    [org.rauschig.jarchivelib ArchiverFactory])
     (:gen-class))
 
-(def root (reval/app-root 'vertu.core))
+(declare evn-path)
+
+(def root )
 (def vertx-dir "vert.x-2.0.2-final")
-(def vertx-zip (str vertx-dir ".zip"))
 (def vertx-bin (reval/file-path [root vertx-dir "bin"]))
 (def vertx-cli (reval/file-path [vertx-bin "vertx"]))
 (def env-path  (str (trim-newline (System/getenv "PATH")) ":" vertx-bin))
 
-(defn load-resource
-  [path]
-  (let [rsc-name path
-        thr (Thread/currentThread)
+(defn read-resource
+  [res-path]
+  (let [thr (Thread/currentThread)
         ldr (.getContextClassLoader thr)]
-    (.getResourceAsStream ldr rsc-name)))
+    (.getResourceAsStream ldr res-path)))
+
+(defn copy-resource [res-path dest-path]
+    (io/copy (read-resource res-path) (io/file dest-path)))
 
 (defn deploy
   []
-  (def target (reval/file-path [root vertx-zip]))
-  (defn copy-resource [source-path dest-path]
-    (io/copy (load-resource source-path) (io/file dest-path)))
-  (copy-resource vertx-zip target)
-  (.extract (ArchiverFactory/createArchiver "zip") (io/file target) (io/file root))
-  (exec "chmod" "+x" vertx-cli))
+  (let [root (reval/app-root 'vertu.core)
+        dir "vert.x-2.0.2-final"
+        zip (str vertx-dir ".zip")
+        bin (reval/file-path [root dir "bin"])
+        target (reval/file-path [root zip])
+        cli (reval/file-path [bin "vertx"])
+        ]
+    (copy-resource zip target)
+    (def env-path (str (trim-newline (System/getenv "PATH")) ":" bin))
+    (.extract (ArchiverFactory/createArchiver "zip") (io/file target) (io/file root))
+    (exec "chmod" "+x" cli)))
 
 (defn vtx-exec
   [command target]
